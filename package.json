@@ -1,0 +1,54 @@
+{
+  "name": "@shadcn/react",
+  "version": "0.2.2",
+  "description": "Unstyled components for React.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "shadcn",
+    "url": "https://twitter.com/shadcn"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shadcn-ui/ui.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://ui.shadcn.com",
+  "bugs": {
+    "url": "https://github.com/shadcn-ui/ui/issues"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "react",
+    "headless",
+    "unstyled",
+    "primitives",
+    "accessible",
+    "ui",
+    "shadcn"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./message-scroller": {
+      "types": "./dist/message-scroller/index.d.ts",
+      "default": "./dist/message-scroller/index.js"
+    }
+  },
+  "peerDependencies": {
+    "@types/react": ">=19",
+    "react": ">=19"
+  },
+  "peerDependenciesMeta": {
+    "@types/react": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  }
+}
