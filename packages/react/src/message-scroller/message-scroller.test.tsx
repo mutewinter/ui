@@ -852,6 +852,66 @@ describe("MessageScroller", () => {
     expect(rendered.viewport().scrollTop).toBe(16)
   })
 
+  it("holds the placed anchor when a row beside it is replaced", async () => {
+    const history = [
+      { id: "message-1", height: 60 },
+      { id: "message-2", height: 60, scrollAnchor: true },
+      { id: "message-3", height: 60 },
+      { id: "message-4", height: 60 },
+    ]
+    const rendered = await renderTestScroller({
+      autoScroll: true,
+      messages: history,
+    })
+
+    await rendered.rerender(
+      [
+        ...history,
+        { id: "message-5", height: 40, scrollAnchor: true },
+        { id: "pending", height: 20 },
+      ],
+      { autoScroll: true }
+    )
+
+    expect(rendered.message("message-5").getBoundingClientRect().top).toBe(64)
+
+    const anchoredScrollTop = rendered.viewport().scrollTop
+
+    await rendered.rerender(
+      [
+        ...history,
+        { id: "message-5", height: 40, scrollAnchor: true },
+        { id: "message-6", height: 20 },
+      ],
+      { autoScroll: true }
+    )
+
+    expect(rendered.viewport().scrollTop).toBe(anchoredScrollTop)
+    expect(rendered.message("message-5").getBoundingClientRect().top).toBe(64)
+  })
+
+  it("does not treat an anchor it opened on as newly arrived", async () => {
+    const rendered = await renderTestScroller({
+      messages: [
+        { id: "message-1", height: 60, scrollAnchor: true },
+        { id: "message-2", height: 60 },
+        { id: "message-3", height: 60 },
+        { id: "pending", height: 60 },
+      ],
+    })
+
+    const openedScrollTop = rendered.viewport().scrollTop
+
+    await rendered.rerender([
+      { id: "message-1", height: 60, scrollAnchor: true },
+      { id: "message-2", height: 60 },
+      { id: "message-3", height: 60 },
+      { id: "message-4", height: 60 },
+    ])
+
+    expect(rendered.viewport().scrollTop).toBe(openedScrollTop)
+  })
+
   it("does not reconcile scroll position when only the parent re-renders", async () => {
     const rendered = await renderTestScrollerWithParent({
       messages: [

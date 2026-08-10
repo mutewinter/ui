@@ -367,18 +367,18 @@ describe("getNewScrollAnchor / getLastScrollAnchor", () => {
 })
 
 describe("getUnanchoredScrollAnchor", () => {
-  it("returns the first anchor that has not been handled yet", () => {
+  it("returns the last anchor that has not been handled yet", () => {
     const items = createItems([
       { id: "a", anchor: true },
       { id: "b", anchor: true },
     ])
     const handled = new WeakSet<HTMLElement>()
 
-    expect(getUnanchoredScrollAnchor(items, handled)).toBe(items[0])
-
-    handled.add(items[0]!)
-
     expect(getUnanchoredScrollAnchor(items, handled)).toBe(items[1])
+
+    handled.add(items[1]!)
+
+    expect(getUnanchoredScrollAnchor(items, handled)).toBe(items[0])
   })
 
   it("returns null when every anchor has already been handled", () => {

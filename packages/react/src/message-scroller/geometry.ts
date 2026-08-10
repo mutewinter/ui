@@ -136,12 +136,18 @@ function getNewScrollAnchor(items: HTMLElement[], previousItemCount: number) {
   return null
 }
 
+// The anchor a content pass has never seen: a row that became one in place,
+// rather than by arriving. Walk from the end, because a row that turned into an
+// anchor without the item count moving is the turn just opened; an unhandled one
+// further up is history the reader has already scrolled past.
 function getUnanchoredScrollAnchor(
   items: HTMLElement[],
   handledAnchors: { has(element: HTMLElement): boolean }
 ) {
-  for (const item of items) {
-    if (item.dataset.scrollAnchor === "true" && !handledAnchors.has(item)) {
+  for (let index = items.length - 1; index >= 0; index--) {
+    const item = items[index]
+
+    if (item?.dataset.scrollAnchor === "true" && !handledAnchors.has(item)) {
       return item
     }
   }

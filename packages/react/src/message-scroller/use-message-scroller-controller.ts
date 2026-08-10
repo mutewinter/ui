@@ -386,6 +386,18 @@ function useMessageScrollerController({
     itemCountRef.current = items.length
     firstItemRef.current = items[0] ?? null
 
+    // Every anchor on screen once this pass is done, so the next pass can tell an
+    // anchor that arrived from one that was already here. Only a row that turns
+    // into an anchor between passes is a turn opening in place; the rest are
+    // history, and jumping to one of those throws the reader up the transcript.
+    const markAnchorsHandled = () => {
+      for (const item of items) {
+        if (item.dataset.scrollAnchor === "true") {
+          handledScrollAnchorsRef.current.add(item)
+        }
+      }
+    }
+
     // Reconcile the scroll position with the new content. Every path re-captures
     // the prepend anchor afterward, so each branch just returns.
     //
@@ -448,7 +460,6 @@ function useMessageScrollerController({
             { align: "start" },
             { keepPreviousPeek: true }
           )
-          handledScrollAnchorsRef.current.add(anchor)
           return
         }
       }
@@ -465,7 +476,6 @@ function useMessageScrollerController({
             { align: "start" },
             { keepPreviousPeek: true }
           )
-          handledScrollAnchorsRef.current.add(anchor)
           return
         }
       }
@@ -481,6 +491,7 @@ function useMessageScrollerController({
     }
 
     reconcileScrollPosition()
+    markAnchorsHandled()
     capturePrependAnchor()
   }, [
     applyDefaultScrollPosition,
