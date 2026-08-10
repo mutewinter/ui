@@ -852,6 +852,30 @@ describe("MessageScroller", () => {
     expect(rendered.viewport().scrollTop).toBe(16)
   })
 
+  it("leaves the scroll alone when rows open between existing turns", async () => {
+    const history = [
+      { id: "message-1", height: 80, scrollAnchor: true },
+      { id: "run", height: 20 },
+      { id: "message-2", height: 80, scrollAnchor: true },
+    ]
+    const rendered = await renderTestScroller({ messages: history })
+
+    const settled = rendered.viewport().scrollTop
+
+    // A collapsed row opening puts its contents back in the middle of the list.
+    // Nothing arrived, so nothing may be anchored: every anchor below the
+    // growth is one the reader has been looking at all along.
+    await rendered.rerender([
+      { id: "message-1", height: 80, scrollAnchor: true },
+      { id: "run", height: 20 },
+      { id: "run-step-1", height: 20 },
+      { id: "run-step-2", height: 20 },
+      { id: "message-2", height: 80, scrollAnchor: true },
+    ])
+
+    expect(rendered.viewport().scrollTop).toBe(settled)
+  })
+
   it("holds the placed anchor when a row beside it is replaced", async () => {
     const history = [
       { id: "message-1", height: 60 },

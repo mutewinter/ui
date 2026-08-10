@@ -439,7 +439,7 @@ function useMessageScrollerController({
       }
 
       if (items.length > previousItemCount) {
-        const anchor = getNewScrollAnchor(items, previousItemCount)
+        const anchor = getNewScrollAnchor(items, handledScrollAnchorsRef.current)
 
         if (anchor) {
           // While the reader is following the live end, a batch of several
@@ -449,7 +449,7 @@ function useMessageScrollerController({
           if (
             autoScrollRef.current &&
             modeRef.current === "following-bottom" &&
-            hasMultipleNewScrollAnchors(items, previousItemCount)
+            hasMultipleNewScrollAnchors(items, handledScrollAnchorsRef.current)
           ) {
             scrollToEnd({ behavior: "auto" })
             return

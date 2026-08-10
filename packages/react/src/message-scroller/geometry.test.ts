@@ -9,6 +9,7 @@ import {
   getMessageScrollerScrollable,
   getNewScrollAnchor,
   getUnanchoredScrollAnchor,
+  hasMultipleNewScrollAnchors,
 } from "./geometry"
 
 // jsdom does not compute layout, so each element's rect, scroll position, and
@@ -327,26 +328,57 @@ describe("getContentBottom", () => {
 })
 
 describe("getNewScrollAnchor / getLastScrollAnchor", () => {
-  it("finds the first anchor at or after the previous item count", () => {
+  it("finds the first anchor no pass has seen", () => {
     const items = createItems([
       { id: "a", anchor: true },
       { id: "b" },
       { id: "c", anchor: true },
       { id: "d", anchor: true },
     ])
+    const handled = new WeakSet<HTMLElement>([items[0]!])
 
-    // Starting from index 1 skips the anchor at index 0.
-    expect(getNewScrollAnchor(items, 1)).toBe(items[2])
+    expect(getNewScrollAnchor(items, handled)).toBe(items[2])
   })
 
-  it("returns null when no anchor exists after the boundary", () => {
+  it("returns null when every anchor has already been seen", () => {
     const items = createItems([
       { id: "a", anchor: true },
       { id: "b" },
       { id: "c" },
     ])
+    const handled = new WeakSet<HTMLElement>([items[0]!])
 
-    expect(getNewScrollAnchor(items, 1)).toBeNull()
+    expect(getNewScrollAnchor(items, handled)).toBeNull()
+  })
+
+  // Rows a reader expands land in the middle of the list, so every index past
+  // the old count is a row that was already on screen.
+  it("ignores anchors the list grew past rather than added", () => {
+    const items = createItems([
+      { id: "a", anchor: true },
+      { id: "opened-1" },
+      { id: "opened-2" },
+      { id: "b", anchor: true },
+    ])
+    const handled = new WeakSet<HTMLElement>([items[0]!, items[3]!])
+
+    expect(getNewScrollAnchor(items, handled)).toBeNull()
+    expect(hasMultipleNewScrollAnchors(items, handled)).toBe(false)
+  })
+
+  it("reports a batch of anchors arriving together", () => {
+    const items = createItems([
+      { id: "a", anchor: true },
+      { id: "b", anchor: true },
+      { id: "c", anchor: true },
+    ])
+    const handled = new WeakSet<HTMLElement>([items[0]!])
+
+    expect(hasMultipleNewScrollAnchors(items, handled)).toBe(true)
+
+    handled.add(items[1]!)
+
+    expect(hasMultipleNewScrollAnchors(items, handled)).toBe(false)
   })
 
   it("finds the last anchor scanning from the end", () => {

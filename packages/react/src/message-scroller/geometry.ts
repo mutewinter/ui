@@ -160,11 +160,20 @@ function getMessageScrollerItems(
   )
 }
 
-function getNewScrollAnchor(items: HTMLElement[], previousItemCount: number) {
-  for (let index = previousItemCount; index < items.length; index++) {
-    const item = items[index]
-
-    if (item?.dataset.scrollAnchor === "true") {
+// The first anchor a content pass has never seen: the turn that arrived, taking
+// the earliest of a batch so a reader who is not following reads them in order.
+//
+// Which anchor is new is a question about identity, never about position. A list
+// can grow anywhere -- a row a reader expands puts rows back in the middle of it
+// -- and an index far enough down that list is every row after the growth, all
+// of them already on screen. Anchoring one of those throws the reader down the
+// transcript for having opened something.
+function getNewScrollAnchor(
+  items: HTMLElement[],
+  handledAnchors: { has(element: HTMLElement): boolean }
+) {
+  for (const item of items) {
+    if (item.dataset.scrollAnchor === "true" && !handledAnchors.has(item)) {
       return item
     }
   }
@@ -193,14 +202,12 @@ function getUnanchoredScrollAnchor(
 
 function hasMultipleNewScrollAnchors(
   items: HTMLElement[],
-  previousItemCount: number
+  handledAnchors: { has(element: HTMLElement): boolean }
 ) {
   let count = 0
 
-  for (let index = previousItemCount; index < items.length; index++) {
-    const item = items[index]
-
-    if (item?.dataset.scrollAnchor !== "true") {
+  for (const item of items) {
+    if (item.dataset.scrollAnchor !== "true" || handledAnchors.has(item)) {
       continue
     }
 
