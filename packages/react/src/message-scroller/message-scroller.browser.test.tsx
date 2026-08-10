@@ -38,6 +38,7 @@ const MessageScrollerButton = MessageScrollerPrimitive.Button
 
 const ITEM_HEIGHT = 80
 const VIEWPORT_HEIGHT = 200
+const DEFAULT_SCROLL_PREVIOUS_ITEM_PEEK = 64
 
 type TestItem = {
   height?: number
@@ -227,8 +228,16 @@ function getVisibleIds() {
   return value ? value.split(",") : []
 }
 
-async function renderThread(props: React.ComponentProps<typeof Thread>) {
+async function renderThread({
+  zoom,
+  ...props
+}: React.ComponentProps<typeof Thread> & { zoom?: number }) {
   container = document.createElement("div")
+
+  if (zoom !== undefined) {
+    container.style.zoom = String(zoom)
+  }
+
   document.body.appendChild(container)
   root = createRoot(container)
   flushSync(() => {
@@ -434,6 +443,59 @@ test("keeps the scroll-to-end button inert at the bottom under an ancestor CSS z
   expect(
     document.querySelector<HTMLButtonElement>("button")?.dataset.active
   ).toBe("false")
+})
+
+// The reading line is a layout-px constant, so on screen it is that constant
+// times the zoom. Placing the anchor means converting client rects into layout
+// px before they meet scrollTop; getting that wrong scales the error by the
+// distance below the fold, which is unbounded.
+test.each([1, 1.5, 2])(
+  "places an appended anchor on the reading line under CSS zoom %s",
+  async (zoom) => {
+    const history = createItems(8)
+
+    await renderThread({ items: history, zoom })
+
+    const viewport = getViewport()
+
+    flushSync(() => {
+      root!.render(
+        <Thread items={[...history, { id: "turn", scrollAnchor: true }]} />
+      )
+    })
+    await settle()
+
+    expect(viewportOffsetOf("turn", viewport)).toBe(
+      Math.round(DEFAULT_SCROLL_PREVIOUS_ITEM_PEEK * zoom)
+    )
+  }
+)
+
+test("reserves the tail spacer in layout px under CSS zoom", async () => {
+  const history = createItems(8)
+
+  await renderThread({ items: history, zoom: 2 })
+
+  const viewport = getViewport()
+
+  flushSync(() => {
+    root!.render(
+      <Thread items={[...history, { id: "turn", scrollAnchor: true }]} />
+    )
+  })
+  await settle()
+
+  // The spacer exists so the turn can reach the reading line with nothing below
+  // it: exactly the room between the end of the turn and the bottom of the
+  // viewport, both in layout px. A rect-derived height would ask for twice it.
+  const spacer = document.querySelector<HTMLElement>(
+    "[data-message-scroller-spacer]"
+  )!
+  const reserved =
+    VIEWPORT_HEIGHT - DEFAULT_SCROLL_PREVIOUS_ITEM_PEEK - ITEM_HEIGHT
+
+  expect(Math.round(Number.parseFloat(spacer.style.height))).toBe(reserved)
+  expect(getDistanceToBottom(viewport)).toBeLessThanOrEqual(1)
 })
 
 test("restores the last scroll anchor when the final turn overflows", async () => {

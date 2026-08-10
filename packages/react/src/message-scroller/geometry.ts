@@ -43,6 +43,39 @@ function getMessageScrollerScrollable({
   }
 }
 
+// The effective ancestor CSS `zoom` on an element, 1 when there is none.
+//
+// The scroller works in two coordinate spaces and `zoom` is the only thing that
+// pulls them apart. getBoundingClientRect reports on-screen pixels, which `zoom`
+// scales; scrollTop, clientHeight, offsetHeight and computed padding are layout
+// pixels, which it does not. Any value that crosses between them has to be
+// divided or multiplied by this first. The error is proportional to the distance
+// measured, so it is invisible near the fold and unbounded away from it.
+function getElementZoom(element: HTMLElement) {
+  const { currentCSSZoom } = element as HTMLElement & {
+    currentCSSZoom?: number
+  }
+
+  if (typeof currentCSSZoom === "number" && currentCSSZoom > 0) {
+    return currentCSSZoom
+  }
+
+  // Engines without currentCSSZoom: the ratio between the one box that can be
+  // read both ways. Zero-width elements (and jsdom, which lays nothing out) fall
+  // through to 1, which is what an unzoomed page would have given anyway.
+  const layoutWidth = element.offsetWidth
+
+  if (layoutWidth > 0) {
+    const ratio = element.getBoundingClientRect().width / layoutWidth
+
+    if (ratio > 0) {
+      return ratio
+    }
+  }
+
+  return 1
+}
+
 function getMessageScrollerVisibilityState({
   content,
   scrollMargin,
@@ -66,8 +99,11 @@ function getMessageScrollerVisibilityState({
   // The reading line sits scrollPreviousItemPeek below scrollMargin: anchored
   // turns land there with the previous turn peeking above. A row only peeking in
   // that band has not been read down to yet, so it counts as neither visible nor
-  // current.
-  const lineTop = viewportRect.top + scrollMargin + scrollPreviousItemPeek
+  // current. The comparisons below are all against client rects, so the two
+  // layout-px props are scaled up to meet them rather than the other way round.
+  const lineTop =
+    viewportRect.top +
+    (scrollMargin + scrollPreviousItemPeek) * getElementZoom(viewport)
   const trackByLayout = typeof IntersectionObserver === "undefined"
 
   const visible: string[] = []
@@ -230,7 +266,9 @@ function getElementScrollTop({
   viewport: HTMLElement
 }) {
   const elementTop = getElementTop(element, viewport)
-  const elementHeight = element.getBoundingClientRect().height
+  // Layout px, to sit alongside clientHeight and the computed padding below.
+  const elementHeight =
+    element.getBoundingClientRect().height / getElementZoom(viewport)
   const contentPadding = getContentBlockPadding(spacer)
 
   if (align === "center") {
@@ -279,17 +317,20 @@ function getElementScrollTop({
   return elementTop - contentPadding.start - scrollMargin
 }
 
+// Where the element sits in the scrollable content, in layout px, so the result
+// can be handed to scrollTo.
 function getElementTop(element: HTMLElement, viewport: HTMLElement) {
-  const elementRect = element.getBoundingClientRect()
-  const viewportRect = viewport.getBoundingClientRect()
-
-  return elementRect.top - viewportRect.top + viewport.scrollTop
+  return getElementViewportTop(element, viewport) + viewport.scrollTop
 }
 
+// How far the element is below the top of the viewport, in layout px. Callers
+// add this to scrollTop or compare it against one, so it cannot stay in the
+// on-screen pixels the rects are measured in.
 function getElementViewportTop(element: HTMLElement, viewport: HTMLElement) {
-  return (
+  const offset =
     element.getBoundingClientRect().top - viewport.getBoundingClientRect().top
-  )
+
+  return offset / getElementZoom(viewport)
 }
 
 function getTailSpacerHeight({
@@ -321,14 +362,17 @@ function getContentBottom({
   const padding = getBlockPadding(content)
   const viewportRect = viewport.getBoundingClientRect()
   const scrollTop = viewport.scrollTop
+  const zoom = getElementZoom(viewport)
   let contentBottom = padding.start + padding.end
 
+  // Layout px throughout: this feeds the tail spacer's height, which is written
+  // back as a CSS length and so is measured the way the padding is.
   for (const item of items) {
     const rect = item.getBoundingClientRect()
 
     contentBottom = Math.max(
       contentBottom,
-      rect.bottom - viewportRect.top + scrollTop + padding.end
+      (rect.bottom - viewportRect.top) / zoom + scrollTop + padding.end
     )
   }
 
