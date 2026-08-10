@@ -53,6 +53,7 @@ type MessageScrollerButtonProps = UseRenderComponentProps<"button", MessageScrol
 };
 
 declare function useMessageScroller(): {
+    releaseAutoScroll: () => void;
     scrollToEnd: (options?: MessageScrollerScrollOptions) => boolean;
     scrollToMessage: (messageId: string, options?: MessageScrollerScrollOptions) => boolean;
     scrollToStart: (options?: MessageScrollerScrollOptions) => boolean;
