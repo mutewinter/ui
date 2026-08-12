@@ -214,6 +214,24 @@ function getScrollTop(viewport: HTMLElement) {
   return Math.round(viewport.scrollTop)
 }
 
+// A reader's own scroll: the intent gesture, then the move it causes, clamped by
+// the browser the way a real wheel is.
+function scrollByGesture(viewport: HTMLElement, delta: number) {
+  viewport.dispatchEvent(
+    new WheelEvent("wheel", { bubbles: true, deltaY: delta })
+  )
+  viewport.scrollTop += delta
+  viewport.dispatchEvent(new Event("scroll", { bubbles: true }))
+}
+
+function getTailSpacer() {
+  const spacer = document.querySelector<HTMLElement>(
+    "[data-message-scroller-spacer]"
+  )!
+
+  return spacer.hidden ? 0 : Math.round(Number.parseFloat(spacer.style.height))
+}
+
 function getCurrentAnchor() {
   return document
     .querySelector('[data-testid="visibility"]')!
@@ -609,6 +627,84 @@ test("user scroll intent cancels follow-bottom", async () => {
 
   expect(getScrollTop(viewport)).toBe(0)
   expect(getDistanceToBottom(viewport)).toBeGreaterThan(0)
+})
+
+// The room a held turn reserves is spent by whoever gets there first: the reply
+// growing into it, or the reader scrolling up through it. These two cover the
+// reader's half, which is the half that used to be taken from them by force.
+const HELD_TURN_ROOM =
+  VIEWPORT_HEIGHT - DEFAULT_SCROLL_PREVIOUS_ITEM_PEEK - ITEM_HEIGHT
+
+async function holdATurn() {
+  const history = createItems(8)
+  const sent = [...history, { id: "turn", scrollAnchor: true }]
+
+  await renderThread({ autoScroll: true, items: history })
+
+  flushSync(() => {
+    root!.render(<Thread autoScroll items={sent} />)
+  })
+  await settle()
+
+  expect(viewportOffsetOf("turn", getViewport())).toBe(
+    DEFAULT_SCROLL_PREVIOUS_ITEM_PEEK
+  )
+  expect(getTailSpacer()).toBe(HELD_TURN_ROOM)
+
+  return sent
+}
+
+test("gives back a held turn's room as the reader scrolls up through it", async () => {
+  const sent = await holdATurn()
+  const viewport = getViewport()
+
+  // A nudge, well short of the room. It costs exactly what was scrolled off,
+  // which is invisible: the room only shrinks to where the viewport already is.
+  scrollByGesture(viewport, -20)
+  await settle()
+
+  expect(viewportOffsetOf("turn", viewport)).toBe(
+    DEFAULT_SCROLL_PREVIOUS_ITEM_PEEK + 20
+  )
+  expect(getTailSpacer()).toBe(HELD_TURN_ROOM - 20)
+
+  // What the step the agent produces next must not do is read the room still
+  // below the content as "the reader is at the end" and pin them to the bottom
+  // over it, taking their 20px with it.
+  flushSync(() => {
+    root!.render(<Thread autoScroll items={[...sent, { id: "reply" }]} />)
+  })
+  await settle()
+
+  expect(viewportOffsetOf("turn", viewport)).toBe(
+    DEFAULT_SCROLL_PREVIOUS_ITEM_PEEK + 20
+  )
+})
+
+test("sticks to the bottom once the reader has scrolled the room away", async () => {
+  const sent = await holdATurn()
+  const viewport = getViewport()
+
+  // Reading further back than the room can pay for spends all of it, and with
+  // nothing holding a position open below the content the transcript is an
+  // ordinary one again: the end is the end.
+  scrollByGesture(viewport, -(HELD_TURN_ROOM + ITEM_HEIGHT))
+  await settle()
+
+  expect(getTailSpacer()).toBe(0)
+  expect(getDistanceToBottom(viewport)).toBeGreaterThan(0)
+
+  // Which means coming back down to the end hands following back, rather than
+  // stranding the reader below a transcript that will not follow.
+  scrollByGesture(viewport, VIEWPORT_HEIGHT * 2)
+  await settle()
+
+  flushSync(() => {
+    root!.render(<Thread autoScroll items={[...sent, { id: "reply" }]} />)
+  })
+  await settle()
+
+  expect(getDistanceToBottom(viewport)).toBeLessThanOrEqual(1)
 })
 
 test("tracks the current anchor as it scrolls above the viewport", async () => {

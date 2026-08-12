@@ -86,6 +86,34 @@ function useMessageScrollerCommands({
     spacer.style.marginTop = nextHeight > 0 ? `${-spacerGapRef.current}px` : ""
   }, [])
 
+  // Give back the room the reader has scrolled up through.
+  //
+  // A held turn's room is consumed two ways, and the reply growing into it is
+  // only one of them: a reader scrolling up through the room is spending it too,
+  // and it is theirs to spend, since the only thing it holds open is a scroll
+  // position below the content. Trimming to the room still between the content
+  // and the fold is invisible either way -- it shrinks to where the viewport
+  // already is, so no scrollTop is ever clamped and nothing moves -- and it
+  // leaves the transcript sticking to the bottom once the room is gone, rather
+  // than as dead space the reader can fall into.
+  const trimTailSpacer = React.useCallback(() => {
+    const content = contentRef.current
+    const viewport = viewportRef.current
+
+    if (!content || !viewport || spacerHeightRef.current === 0) {
+      return
+    }
+
+    setTailSpacerHeight(
+      getTailSpacerHeight({
+        content,
+        scrollTop: viewport.scrollTop,
+        spacer: spacerRef.current,
+        viewport,
+      })
+    )
+  }, [setTailSpacerHeight])
+
   const scrollToPosition = React.useCallback(
     (
       scrollTop: number,
@@ -320,6 +348,7 @@ function useMessageScrollerCommands({
     scrollToEnd,
     scrollToMessage,
     scrollToStart,
+    trimTailSpacer,
   }
 }
 

@@ -133,10 +133,12 @@ function useMessageScrollerController({
   // Owns the one follow-bottom transition: arm at the bottom, release on any
   // scroll away (including a scrollbar drag), suppressed during a programmatic
   // scroll so the auto-scroll animation cannot release itself. Arming also
-  // skips the anchored-to-message hold: the tail spacer makes a freshly
-  // anchored turn read as "at the end", and re-arming there would let the
-  // first streamed chunk yank the reader off the anchor. The hold hands back
-  // to following in handleResize, once the reply consumes the tail spacer.
+  // skips a turn held at the reading line, in either of the two ways one can be:
+  // the hold itself, and any reserved room left below the content. Reserved room
+  // makes the transcript read as "at the end" while the reader is looking at a
+  // line well above it, and arming there would let the next streamed chunk yank
+  // them to the bottom and collapse the room in the same frame. The hold hands
+  // back to following in handleResize, once the reply consumes that room.
   const reconcileFollowMode = React.useCallback(
     (scrollable: MessageScrollerScrollable) => {
       const scrollTop = viewportRef.current?.scrollTop ?? 0
@@ -152,6 +154,7 @@ function useMessageScrollerController({
       if (
         autoScrollRef.current &&
         !scrollable.end &&
+        spacerHeightRef.current === 0 &&
         modeRef.current !== "settling-jump" &&
         modeRef.current !== "anchored-to-message"
       ) {
@@ -242,6 +245,7 @@ function useMessageScrollerController({
     scrollToEnd,
     scrollToMessage,
     scrollToStart,
+    trimTailSpacer,
   } = useMessageScrollerCommands({
     refs,
     commitScrollState,
@@ -533,6 +537,15 @@ function useMessageScrollerController({
       return
     }
 
+    // Content growing under a reader who has taken the scroll back eats into
+    // whatever room a released hold left, the same as it would have under the
+    // hold. Trimming as it grows is what ends the room on the frame the reply
+    // fills it, rather than leaving it as dead space at the foot of the
+    // transcript.
+    if (modeRef.current === "free-scrolling") {
+      trimTailSpacer()
+    }
+
     scheduleStateCommit()
     scheduleVisibilitySync()
   }, [
@@ -540,6 +553,7 @@ function useMessageScrollerController({
     scheduleStateCommit,
     scheduleVisibilitySync,
     scrollToEnd,
+    trimTailSpacer,
   ])
 
   const observeVisibility = React.useCallback(() => {
@@ -669,10 +683,23 @@ function useMessageScrollerController({
   )
 
   const syncAfterScroll = React.useCallback(() => {
+    // A gesture has already released any hold by the time its scroll lands, so
+    // the room below the content is the reader's to spend: give back the part
+    // they scrolled up through before the state is read, and follow-bottom arms
+    // the moment they reach the bottom of the content itself.
+    if (modeRef.current === "free-scrolling") {
+      trimTailSpacer()
+    }
+
     commitScrollState()
     scheduleVisibilitySync()
     capturePrependAnchor()
-  }, [capturePrependAnchor, commitScrollState, scheduleVisibilitySync])
+  }, [
+    capturePrependAnchor,
+    commitScrollState,
+    scheduleVisibilitySync,
+    trimTailSpacer,
+  ])
 
   const context = React.useMemo<MessageScrollerContextValue>(
     () => ({
