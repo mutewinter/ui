@@ -150,27 +150,7 @@ function getMessageScrollerVisibilityState({
   }
 }
 
-// The rows the scroller tracks: `Item`s, and nothing else the caller drew.
-//
-// A log is rarely only its messages. A loading row, an empty state, a failed
-// fetch's retry card -- all of them are content the caller renders in the same
-// place, and none of them is a message. Counting one as a row means the scroller
-// believes it has content before any has arrived: the opening position is spent
-// on a placeholder, and the transcript that replaces it reads as messages
-// appended to a list that was already there.
 function getMessageScrollerItems(
-  content: HTMLElement,
-  spacer: HTMLElement | null
-) {
-  return getMessageScrollerChildren(content, spacer).filter(
-    (child) => child.dataset.messageScrollerItem !== undefined
-  )
-}
-
-// Everything the caller drew, whether or not it is a row. Only the extent of the
-// content is measured this way: a placeholder still takes up room, and a tail
-// spacer sized as though it did not would hang below the last thing on screen.
-function getMessageScrollerChildren(
   content: HTMLElement,
   spacer: HTMLElement | null
 ) {
@@ -385,7 +365,7 @@ function getContentBottom({
   spacer: HTMLElement | null
   viewport: HTMLElement
 }) {
-  const items = getMessageScrollerChildren(content, spacer)
+  const items = getMessageScrollerItems(content, spacer)
   const padding = getBlockPadding(content)
   const viewportRect = viewport.getBoundingClientRect()
   const scrollTop = viewport.scrollTop

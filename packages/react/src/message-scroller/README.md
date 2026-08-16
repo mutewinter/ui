@@ -41,25 +41,26 @@ All from `@shadcn/react/message-scroller`.
 | `MessageScroller.Item`     | One message wrapper                                                        | `messageId`, `scrollAnchor`                                                                            |
 | `MessageScroller.Button`   | Scroll-to-end/start affordance; auto-hides when caught up                  | `direction`                                                                                            |
 
-Only an `Item` is a message. Anything else rendered in `Content` — a loading
-row, an empty state, a failed fetch's retry card — is drawn and measured, so it
-takes up its room, but it is not counted as a row, never anchored to, and never
-spends `defaultScrollPosition`. A thread that opens on a placeholder therefore
-opens at its `defaultScrollPosition` when the messages arrive.
+`Content` holds whatever the caller draws. `Item` is what a row is addressed and
+anchored by, and a thread that has none — one component rendering the whole
+transcript flat — is a thread with no anchors rather than a thread with no
+content.
 
 `defaultScrollPosition` is applied once, on the first render where there is a
 scroll range to apply it to. A thread shorter than its viewport is already
 showing every position at once, so it does not count: a last message whose
 height arrives with a load — a video, an image, a card that measures itself —
-opens where it was asked to once that load makes the thread overflow.
+opens where it was asked to once that load makes the thread overflow. A reader
+who scrolls, or anything routed through `releaseAutoScroll`, settles it early:
+they have taken the scroller over.
 
 ### Hooks (flat siblings)
 
-| Hook                             | Returns                                                                                  |
-| -------------------------------- | ---------------------------------------------------------------------------------------- |
-| `useMessageScroller()`           | `{ scrollToMessage, scrollToStart, scrollToEnd, releaseAutoScroll }`                     |
+| Hook                             | Returns                                                                     |
+| -------------------------------- | --------------------------------------------------------------------------- |
+| `useMessageScroller()`           | `{ scrollToMessage, scrollToStart, scrollToEnd, releaseAutoScroll }`         |
 | `useMessageScrollerScrollable()` | `MessageScrollerScrollable` — `{ start, end }`, the edges the viewport can scroll toward |
-| `useMessageScrollerVisibility()` | `MessageScrollerVisibilityState` — `currentAnchorId`, `visibleMessageIds`                |
+| `useMessageScrollerVisibility()` | `MessageScrollerVisibilityState` — `currentAnchorId`, `visibleMessageIds`   |
 
 ### Types
 

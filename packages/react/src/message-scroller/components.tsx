@@ -343,7 +343,6 @@ function MessageScrollerItem({
     <div
       ref={setItemRef}
       data-message-id={messageId}
-      data-message-scroller-item=""
       data-scroll-anchor={scrollAnchor ? "true" : "false"}
       {...props}
     />

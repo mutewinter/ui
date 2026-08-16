@@ -6,7 +6,6 @@ import {
   getContentBottom,
   getElementScrollTop,
   getLastScrollAnchor,
-  getMessageScrollerItems,
   getMessageScrollerScrollable,
   getNewScrollAnchor,
   getUnanchoredScrollAnchor,
@@ -137,7 +136,6 @@ function createFixture(options: {
       element.dataset.messageId = item.messageId
     }
 
-    element.dataset.messageScrollerItem = ""
     element.dataset.scrollAnchor = item.scrollAnchor ? "true" : "false"
     // Item rects are in client coordinates: viewport-relative top shifted by the
     // viewport's own top so getElementTop adds back scrollTop correctly.
@@ -156,7 +154,6 @@ function createItems(
   return specs.map((spec) => {
     const element = document.createElement("div")
     element.dataset.messageId = spec.id
-    element.dataset.messageScrollerItem = ""
     element.dataset.scrollAnchor = spec.anchor ? "true" : "false"
     return element
   })
@@ -327,54 +324,6 @@ describe("getContentBottom", () => {
     setRect(spacer, { top: 0, height: 9999 })
 
     expect(getContentBottom({ content, spacer, viewport })).toBe(80)
-  })
-
-  it("counts content that is not a row", () => {
-    stubComputedStyle()
-    const { content, spacer, viewport } = createFixture({
-      viewportHeight: 200,
-      scrollTop: 0,
-      contentPaddingStart: 0,
-      contentPaddingEnd: 0,
-      items: [{ messageId: "a", top: 0, height: 80 }],
-    })
-
-    // A loading row, an empty state, a retry card: not a message, but room the
-    // content really takes. A tail spacer sized without it hangs below the last
-    // thing on screen.
-    const placeholder = document.createElement("div")
-    setRect(placeholder, { top: 80, height: 120 })
-    content.insertBefore(placeholder, spacer)
-
-    expect(getContentBottom({ content, spacer, viewport })).toBe(200)
-  })
-})
-
-describe("getMessageScrollerItems", () => {
-  it("takes the rows and leaves everything else the caller drew", () => {
-    const { content, spacer } = createFixture({
-      viewportHeight: 200,
-      items: [{ messageId: "a", top: 0, height: 80 }],
-    })
-
-    const placeholder = document.createElement("div")
-    content.insertBefore(placeholder, spacer)
-
-    expect(
-      getMessageScrollerItems(content, spacer).map(
-        (item) => item.dataset.messageId
-      )
-    ).toEqual(["a"])
-  })
-
-  it("takes a row that carries no message id", () => {
-    // A turn that has opened but has nothing in it yet is a row without an id.
-    const { content, spacer } = createFixture({
-      viewportHeight: 200,
-      items: [{ top: 0, height: 80 }],
-    })
-
-    expect(getMessageScrollerItems(content, spacer)).toHaveLength(1)
   })
 })
 
