@@ -7,6 +7,7 @@ import {
   getFirstVisibleMessageItem,
   getFlexGap,
   getLastScrollAnchor,
+  getMaxScrollTop,
   getMessageScrollerItems,
   getMessageScrollerScrollable,
   getMessageScrollerVisibilityState,
@@ -350,19 +351,37 @@ function useMessageScrollerController({
       return false
     }
 
+    // Nothing to scroll is not the same as opening where you were asked to.
+    //
+    // Content reaches its final height in its own time: an image or a video
+    // whose box is settled by a load, a font swapping in, a card measuring
+    // itself. Until then a thread can be shorter than its viewport, and every
+    // opening position -- start, end, the last anchor -- is the one place the
+    // reader already is. Scrolling there succeeds without moving anything.
+    //
+    // Treating that as the position having been applied spends it. When the
+    // content then grows past the viewport there is somewhere to be for the
+    // first time, and nothing left that would put the reader there: the thread
+    // opens at the top for as long as it stays open. So the position is held
+    // open until there is a scroll range to apply it to, and handleResize
+    // takes the growth that creates one as the moment to apply it.
+    const viewport = viewportRef.current
+
+    if (!viewport || getMaxScrollTop(viewport) === 0) {
+      return false
+    }
+
     let handled = false
 
     if (defaultScrollPosition === "last-anchor") {
       const content = contentRef.current
-      const viewport = viewportRef.current
-      const anchor =
-        content && viewport
-          ? getLastScrollAnchor(
-              getMessageScrollerItems(content, spacerRef.current)
-            )
-          : null
+      const anchor = content
+        ? getLastScrollAnchor(
+            getMessageScrollerItems(content, spacerRef.current)
+          )
+        : null
 
-      if (!content || !viewport || !anchor) {
+      if (!content || !anchor) {
         handled = scrollToEnd({ behavior: "auto" })
       } else {
         const anchorTop = getElementTop(anchor, viewport)
@@ -466,7 +485,10 @@ function useMessageScrollerController({
       }
 
       if (items.length > previousItemCount) {
-        const anchor = getNewScrollAnchor(items, handledScrollAnchorsRef.current)
+        const anchor = getNewScrollAnchor(
+          items,
+          handledScrollAnchorsRef.current
+        )
 
         if (anchor) {
           // While the reader is following the live end, a batch of several
@@ -555,6 +577,16 @@ function useMessageScrollerController({
   const handleResize = React.useCallback(() => {
     const rewrapped = didViewportRewrap()
 
+    // Content that grew past its viewport for the first time. Until this frame
+    // the thread fit, so the opening position had nowhere to put the reader and
+    // is still owed to them; this is the earliest moment it can be paid. It
+    // comes first because it is the opening placement -- what the reader has
+    // not been given yet -- and everything below is about holding a placement
+    // they already have.
+    if (applyDefaultScrollPosition()) {
+      return
+    }
+
     if (modeRef.current === "following-bottom" && autoScrollRef.current) {
       scrollToEnd({ behavior: "auto" })
       return
@@ -609,6 +641,7 @@ function useMessageScrollerController({
     scheduleStateCommit()
     scheduleVisibilitySync()
   }, [
+    applyDefaultScrollPosition,
     didViewportRewrap,
     reanchorToAnchoredMessage,
     scheduleStateCommit,

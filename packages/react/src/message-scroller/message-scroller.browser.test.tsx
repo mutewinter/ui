@@ -330,6 +330,50 @@ test("opens at the bottom by default", async () => {
   expect(getDistanceToBottom(getViewport())).toBeLessThanOrEqual(1)
 })
 
+// The last message is a video, an image, a card that measures itself: its box
+// is settled by a load rather than by the first layout, so the thread is
+// briefly shorter than its viewport. Every opening position is satisfied by
+// standing still while that is true, and the growth that follows is the first
+// moment the reader can actually be put anywhere.
+test("opens at the bottom when the last message grows into a scroll range", async () => {
+  await renderThread({ items: [{ height: 120, id: "m0" }] })
+
+  const viewport = getViewport()
+  expect(getScrollTop(viewport)).toBe(0)
+  // The premise: the thread fit, so opening at the end moved nothing.
+  expect(viewport.scrollHeight).toBeLessThanOrEqual(viewport.clientHeight)
+
+  flushSync(() => {
+    root!.render(<Thread items={[{ height: 600, id: "m0" }]} />)
+  })
+  await settle()
+
+  expect(getDistanceToBottom(viewport)).toBeLessThanOrEqual(1)
+})
+
+// The same growth, read as the thing that must not happen: a reader who has
+// scrolled away keeps their place, because the position was applied the moment
+// there was a range and they moved after it.
+test("leaves the reader where they scrolled once the position has been applied", async () => {
+  await renderThread({ items: createItems(8) })
+
+  const viewport = getViewport()
+  scrollByGesture(viewport, -3 * ITEM_HEIGHT)
+  await settle()
+
+  const parked = getScrollTop(viewport)
+  expect(parked).toBeGreaterThan(0)
+
+  flushSync(() => {
+    root!.render(
+      <Thread items={[...createItems(8), { height: 300, id: "m8" }]} />
+    )
+  })
+  await settle()
+
+  expect(getScrollTop(viewport)).toBe(parked)
+})
+
 // A thread whose messages are fetched draws something else first -- a spinner,
 // an empty state, a retry card. None of them is a message, so the opening
 // position belongs to the thread that replaces them, not to the wait.

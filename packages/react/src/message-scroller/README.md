@@ -47,6 +47,12 @@ takes up its room, but it is not counted as a row, never anchored to, and never
 spends `defaultScrollPosition`. A thread that opens on a placeholder therefore
 opens at its `defaultScrollPosition` when the messages arrive.
 
+`defaultScrollPosition` is applied once, on the first render where there is a
+scroll range to apply it to. A thread shorter than its viewport is already
+showing every position at once, so it does not count: a last message whose
+height arrives with a load — a video, an image, a card that measures itself —
+opens where it was asked to once that load makes the thread overflow.
+
 ### Hooks (flat siblings)
 
 | Hook                             | Returns                                                                                  |
