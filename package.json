@@ -1,6 +1,6 @@
 {
   "name": "@shadcn/react",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "description": "Unstyled components for React.",
   "publishConfig": {
     "access": "public"
