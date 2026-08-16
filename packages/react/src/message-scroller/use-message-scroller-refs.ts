@@ -25,6 +25,7 @@ type MessageScrollerRefs = {
   streamingTurnRef: React.RefObject<HTMLElement | null>
   contentRef: React.RefObject<HTMLDivElement | null>
   defaultScrollPositionAppliedRef: React.RefObject<boolean>
+  defaultScrollPositionAtRef: React.RefObject<number | null>
   firstItemRef: React.RefObject<HTMLElement | null>
   itemCountRef: React.RefObject<number>
   lastScrollTopRef: React.RefObject<number>
@@ -50,6 +51,7 @@ type MessageScrollerRefs = {
   stateFrameRef: React.RefObject<number | null>
   stateStore: MessageScrollerStore<MessageScrollerScrollable>
   viewportRef: React.RefObject<HTMLDivElement | null>
+  viewportHeightRef: React.RefObject<number | null>
   viewportWidthRef: React.RefObject<number | null>
   visibilityFrameRef: React.RefObject<number | null>
   visibilityObserverRef: React.RefObject<IntersectionObserver | null>
@@ -79,6 +81,10 @@ function useMessageScrollerRefs({
   const autoscrollingRef = React.useRef(false)
   const contentRef = React.useRef<HTMLDivElement | null>(null)
   const defaultScrollPositionAppliedRef = React.useRef(false)
+  // Where the opening position last put the reader. Still being there is what
+  // makes the placement theirs to re-apply as the thread settles; having moved
+  // off it, by any means, is them having taken the scroller over.
+  const defaultScrollPositionAtRef = React.useRef<number | null>(null)
   const scrollEdgeThresholdRef = React.useRef(scrollEdgeThreshold)
   const itemCountRef = React.useRef(0)
   const firstItemRef = React.useRef<HTMLElement | null>(null)
@@ -118,6 +124,7 @@ function useMessageScrollerRefs({
   // The viewport's width at the last resize pass, so the next one can tell the
   // content being rewrapped from the content simply growing. Null until the
   // first pass, which has nothing to compare against.
+  const viewportHeightRef = React.useRef<number | null>(null)
   const viewportWidthRef = React.useRef<number | null>(null)
   const visibilityFrameRef = React.useRef<number | null>(null)
   const visibilityObserverRef = React.useRef<IntersectionObserver | null>(null)
@@ -152,6 +159,7 @@ function useMessageScrollerRefs({
     streamingTurnRef,
     contentRef,
     defaultScrollPositionAppliedRef,
+    defaultScrollPositionAtRef,
     firstItemRef,
     itemCountRef,
     lastScrollTopRef,
@@ -171,6 +179,7 @@ function useMessageScrollerRefs({
     stateFrameRef,
     stateStore: stateStoreRef.current,
     viewportRef,
+    viewportHeightRef,
     viewportWidthRef,
     visibilityFrameRef,
     visibilityObserverRef,

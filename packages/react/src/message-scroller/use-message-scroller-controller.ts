@@ -73,6 +73,7 @@ function useMessageScrollerController({
     autoscrollingTimeoutRef,
     contentRef,
     defaultScrollPositionAppliedRef,
+    defaultScrollPositionAtRef,
     firstItemRef,
     itemCountRef,
     lastScrollTopRef,
@@ -91,6 +92,7 @@ function useMessageScrollerController({
     spacerRef,
     stateFrameRef,
     stateStore,
+    viewportHeightRef,
     viewportRef,
     viewportWidthRef,
     visibilityFrameRef,
@@ -343,28 +345,17 @@ function useMessageScrollerController({
   }, [capturePrependAnchor, flushPendingScrollToMessage])
 
   const applyDefaultScrollPosition = React.useCallback(() => {
-    if (
-      !defaultScrollPosition ||
-      defaultScrollPositionAppliedRef.current ||
-      itemCountRef.current === 0
-    ) {
+    if (!defaultScrollPosition || defaultScrollPositionAppliedRef.current) {
       return false
     }
 
-    // Nothing to scroll is not the same as opening where you were asked to.
-    //
-    // Content reaches its final height in its own time: an image or a video
-    // whose box is settled by a load, a font swapping in, a card measuring
-    // itself. Until then a thread can be shorter than its viewport, and every
-    // opening position -- start, end, the last anchor -- is the one place the
-    // reader already is. Scrolling there succeeds without moving anything.
-    //
-    // Treating that as the position having been applied spends it. When the
-    // content then grows past the viewport there is somewhere to be for the
-    // first time, and nothing left that would put the reader there: the thread
-    // opens at the top for as long as it stays open. So the position is held
-    // open until there is a scroll range to apply it to, and handleResize
-    // takes the growth that creates one as the moment to apply it.
+    // Deliberately not gated on there being rows. A consumer that draws its
+    // whole thread flat, with no `Item` anywhere, has no rows and still has a
+    // thread to open; requiring one refuses to place them at all. What stands
+    // in for "there is something here" is the scroll range below, which no
+    // empty thread has.
+
+    // Nothing to scroll yet is not a position anyone has been put in.
     const viewport = viewportRef.current
 
     if (!viewport || getMaxScrollTop(viewport) === 0) {
@@ -409,13 +400,26 @@ function useMessageScrollerController({
           : scrollToStart({ behavior: "auto" })
     }
 
-    if (!handled) {
-      return false
+    // Applying it does not spend it.
+    //
+    // A thread reaches its final height in its own time, and the scroller has
+    // no way to be told when: a video or an image whose box is settled by a
+    // load, a font swapping in, a section that measures itself and un-clamps a
+    // frame later. Each of those is a height the opening position was computed
+    // against and is now wrong by. One of them leaves the reader a few hundred
+    // pixels short; several leave them somewhere arbitrary in the middle. A
+    // scroll range existing does not mean the thread has settled either -- it
+    // can overflow and still be growing -- so the position is re-applied as the
+    // thread settles under it, and `handleResize` decides when that is.
+    //
+    // Where it landed them is remembered, because that is what makes the next
+    // one still theirs to give: a reader sitting exactly where they were put
+    // has not chosen anything yet.
+    if (handled) {
+      defaultScrollPositionAtRef.current = viewport.scrollTop
     }
 
-    defaultScrollPositionAppliedRef.current = true
-
-    return true
+    return handled
   }, [defaultScrollPosition, scrollToElement, scrollToEnd, scrollToStart])
 
   const handleContentChange = React.useCallback(() => {
@@ -540,6 +544,18 @@ function useMessageScrollerController({
     }
 
     reconcileScrollPosition()
+
+    // The thread settling and the thread changing are different things, and only
+    // the first is still the thread opening. A row arriving, leaving, or being
+    // replaced puts the branches above in charge of where the reader ends up,
+    // and re-applying the opening position over the top of one of them would
+    // undo it. Growth with the same rows -- a load resolving, a section
+    // un-clamping -- reaches handleResize instead, and there the position is
+    // still owed.
+    if (previousItemCount !== 0) {
+      defaultScrollPositionAppliedRef.current = true
+    }
+
     markAnchorsHandled()
     capturePrependAnchor()
   }, [
@@ -574,16 +590,63 @@ function useMessageScrollerController({
     return previous !== null && previous !== next
   }, [])
 
+  // Whether the reader is still standing where the opening position put them.
+  // True before it has placed anyone: nothing has been chosen yet either way.
+  const isRestingAtDefaultScrollPosition = React.useCallback(() => {
+    const placedAt = defaultScrollPositionAtRef.current
+    const viewport = viewportRef.current
+
+    if (placedAt === null) {
+      return true
+    }
+
+    return (
+      viewport !== null &&
+      Math.abs(viewport.scrollTop - placedAt) <= SCROLL_POSITION_EPSILON
+    )
+  }, [])
+
+  // Whether the viewport itself changed size since the last resize pass, as
+  // opposed to the content inside it. Measured every pass so the stored box
+  // never goes stale enough to report a change that did not happen.
+  const didViewportResize = React.useCallback(() => {
+    const viewport = viewportRef.current
+
+    if (!viewport) {
+      return false
+    }
+
+    const previous = viewportHeightRef.current
+    const next = viewport.clientHeight
+
+    viewportHeightRef.current = next
+
+    return previous !== null && previous !== next
+  }, [])
+
   const handleResize = React.useCallback(() => {
     const rewrapped = didViewportRewrap()
+    const viewportResized = didViewportResize() || rewrapped
 
-    // Content that grew past its viewport for the first time. Until this frame
-    // the thread fit, so the opening position had nowhere to put the reader and
-    // is still owed to them; this is the earliest moment it can be paid. It
-    // comes first because it is the opening placement -- what the reader has
-    // not been given yet -- and everything below is about holding a placement
-    // they already have.
-    if (applyDefaultScrollPosition()) {
+    // The thread settling under a reader who has not moved. Two things have to
+    // hold, and each rules out a resize that means something else:
+    //
+    // The viewport is the same box. A viewport that changed size is the window
+    // being resized or a pane opening, and following the end through one of
+    // those is not opening a thread -- it is a reader at rest being dragged.
+    //
+    // And they are still exactly where the opening position put them. Moving
+    // off it is the reader choosing a place, whether or not the move announced
+    // itself as a gesture: a scrollbar drag and a bare programmatic scroll both
+    // arrive without one, and both mean the position on screen is theirs now.
+    //
+    // What is left is the case this exists for -- the same rows, in the same
+    // box, taller than they were, under someone who has not touched anything.
+    if (
+      !viewportResized &&
+      isRestingAtDefaultScrollPosition() &&
+      applyDefaultScrollPosition()
+    ) {
       return
     }
 
@@ -642,7 +705,9 @@ function useMessageScrollerController({
     scheduleVisibilitySync()
   }, [
     applyDefaultScrollPosition,
+    didViewportResize,
     didViewportRewrap,
+    isRestingAtDefaultScrollPosition,
     reanchorToAnchoredMessage,
     scheduleStateCommit,
     scheduleVisibilitySync,

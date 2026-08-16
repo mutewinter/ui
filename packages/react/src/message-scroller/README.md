@@ -41,26 +41,36 @@ All from `@shadcn/react/message-scroller`.
 | `MessageScroller.Item`     | One message wrapper                                                        | `messageId`, `scrollAnchor`                                                                            |
 | `MessageScroller.Button`   | Scroll-to-end/start affordance; auto-hides when caught up                  | `direction`                                                                                            |
 
-`Content` holds whatever the caller draws. `Item` is what a row is addressed and
-anchored by, and a thread that has none — one component rendering the whole
-transcript flat — is a thread with no anchors rather than a thread with no
-content.
+Only an `Item` is a message. Anything else rendered in `Content` — a loading
+row, an empty state, a failed fetch's retry card — is drawn and measured, so it
+takes up its room, but it is not counted as a row, never anchored to, and never
+spends `defaultScrollPosition`. A thread that opens on a placeholder therefore
+opens at its `defaultScrollPosition` when the messages arrive.
 
-`defaultScrollPosition` is applied once, on the first render where there is a
-scroll range to apply it to. A thread shorter than its viewport is already
-showing every position at once, so it does not count: a last message whose
-height arrives with a load — a video, an image, a card that measures itself —
-opens where it was asked to once that load makes the thread overflow. A reader
-who scrolls, or anything routed through `releaseAutoScroll`, settles it early:
-they have taken the scroller over.
+A thread with no `Item` at all — one component drawing the whole transcript
+flat — is a thread with no anchors rather than a thread with no content, and it
+still opens where it was asked to.
+
+`defaultScrollPosition` is owed to the reader until something happens that the
+placement should defer to, and re-applied as the thread settles under it. A
+thread reaches its final height in its own time: a video or an image whose box
+is settled by a load, a font swapping in, a section that measures itself and
+un-clamps a frame later. Each of those is a height the position was computed
+against and is now wrong by, and a thread can overflow its viewport and still
+be growing, so a scroll range existing is not the thread having settled.
+
+What ends it is an event, not a measurement: the reader scrolling (or anything
+routed through `releaseAutoScroll`), a row arriving or leaving, or
+`scrollToMessage`. Growth with the same rows is the thread still settling, and
+the position is re-applied over it.
 
 ### Hooks (flat siblings)
 
-| Hook                             | Returns                                                                     |
-| -------------------------------- | --------------------------------------------------------------------------- |
-| `useMessageScroller()`           | `{ scrollToMessage, scrollToStart, scrollToEnd, releaseAutoScroll }`         |
+| Hook                             | Returns                                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `useMessageScroller()`           | `{ scrollToMessage, scrollToStart, scrollToEnd, releaseAutoScroll }`                     |
 | `useMessageScrollerScrollable()` | `MessageScrollerScrollable` — `{ start, end }`, the edges the viewport can scroll toward |
-| `useMessageScrollerVisibility()` | `MessageScrollerVisibilityState` — `currentAnchorId`, `visibleMessageIds`   |
+| `useMessageScrollerVisibility()` | `MessageScrollerVisibilityState` — `currentAnchorId`, `visibleMessageIds`                |
 
 ### Types
 

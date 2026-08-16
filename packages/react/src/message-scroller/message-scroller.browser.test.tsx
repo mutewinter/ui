@@ -351,6 +351,96 @@ test("opens at the bottom when the last message grows into a scroll range", asyn
   expect(getDistanceToBottom(viewport)).toBeLessThanOrEqual(1)
 })
 
+// A consumer that draws its whole thread flat has no `Item` anywhere. That is a
+// thread with no anchors, not a thread with no content, and it still opens
+// where it was asked to.
+test("opens at the bottom with no items at all", async () => {
+  container = document.createElement("div")
+  document.body.appendChild(container)
+  root = createRoot(container)
+  flushSync(() => {
+    root!.render(
+      <MessageScrollerProvider defaultScrollPosition="end">
+        <MessageScroller>
+          <MessageScrollerViewport
+            aria-label="viewport"
+            style={{ height: VIEWPORT_HEIGHT, overflowY: "auto" }}
+          >
+            <MessageScrollerContent>
+              <div style={{ height: 900 }}>a whole thread, drawn flat</div>
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+        </MessageScroller>
+      </MessageScrollerProvider>
+    )
+  })
+  await settle()
+
+  expect(getDistanceToBottom(getViewport())).toBeLessThanOrEqual(1)
+})
+
+// Several late boxes, so the thread overflows before it has finished growing.
+// A range existing is not the thread having settled: the position computed
+// against the first overflow is short by everything that arrives after it.
+test("opens at the bottom when a thread that already overflows grows again", async () => {
+  await renderThread({
+    items: [
+      { height: 150, id: "m0" },
+      { height: 150, id: "m1" },
+    ],
+  })
+
+  const viewport = getViewport()
+  // The premise: it overflows already, so the range check alone is satisfied.
+  expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight)
+  expect(getDistanceToBottom(viewport)).toBeLessThanOrEqual(1)
+
+  flushSync(() => {
+    root!.render(
+      <Thread
+        items={[
+          { height: 600, id: "m0" },
+          { height: 600, id: "m1" },
+        ]}
+      />
+    )
+  })
+  await settle()
+
+  expect(getDistanceToBottom(viewport)).toBeLessThanOrEqual(1)
+})
+
+// A turn arriving is the thread being live rather than opening, so it takes the
+// placement over: the reply growing under it must not pull the reader to the end.
+test("stops opening at the bottom once a turn has been anchored", async () => {
+  await renderThread({ items: createItems(6) })
+
+  flushSync(() => {
+    root!.render(
+      <Thread items={[...createItems(6), { id: "m6", scrollAnchor: true }]} />
+    )
+  })
+  await settle()
+
+  const anchored = getScrollTop(getViewport())
+  expect(viewportOffsetOf("m6", getViewport())).toBeLessThan(VIEWPORT_HEIGHT)
+
+  // The reply fills in under the anchored turn.
+  flushSync(() => {
+    root!.render(
+      <Thread
+        items={[
+          ...createItems(6),
+          { height: 400, id: "m6", scrollAnchor: true },
+        ]}
+      />
+    )
+  })
+  await settle()
+
+  expect(getScrollTop(getViewport())).toBe(anchored)
+})
+
 // A reader who acted while the thread still fit has taken the scroller over,
 // so the growth that follows is content arriving under them, not the thread
 // opening. Jumping them to the end there reads as the transcript moving for
