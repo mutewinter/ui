@@ -351,6 +351,31 @@ test("opens at the bottom when the last message grows into a scroll range", asyn
   expect(getDistanceToBottom(viewport)).toBeLessThanOrEqual(1)
 })
 
+// A reader who acted while the thread still fit has taken the scroller over,
+// so the growth that follows is content arriving under them, not the thread
+// opening. Jumping them to the end there reads as the transcript moving for
+// having been touched.
+test("does not open at the bottom once the reader has taken the scroller", async () => {
+  await renderThread({
+    items: [{ height: 120, id: "m0" }],
+    showReleaseButton: true,
+  })
+
+  const viewport = getViewport()
+  expect(viewport.scrollHeight).toBeLessThanOrEqual(viewport.clientHeight)
+
+  document.querySelector<HTMLButtonElement>('[data-testid="release"]')!.click()
+
+  flushSync(() => {
+    root!.render(
+      <Thread items={[{ height: 600, id: "m0" }]} showReleaseButton />
+    )
+  })
+  await settle()
+
+  expect(getScrollTop(viewport)).toBe(0)
+})
+
 // The same growth, read as the thing that must not happen: a reader who has
 // scrolled away keeps their place, because the position was applied the moment
 // there was a range and they moved after it.

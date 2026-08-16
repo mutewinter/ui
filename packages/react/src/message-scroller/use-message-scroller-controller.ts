@@ -741,6 +741,14 @@ function useMessageScrollerController({
   )
 
   const userScrollIntent = React.useCallback(() => {
+    // The opening position is owed only to a reader who has not acted yet. One
+    // who has -- a gesture, or a row they opened -- has taken the scroller over,
+    // and a thread that grows past its viewport after that is content arriving
+    // under them rather than a thread opening. Without this, a short thread
+    // holds the position open indefinitely and pays it into the first growth,
+    // which reads as the transcript jumping for having been touched.
+    defaultScrollPositionAppliedRef.current = true
+
     if (
       modeRef.current === "following-bottom" ||
       modeRef.current === "anchored-to-message" ||
