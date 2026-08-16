@@ -41,13 +41,19 @@ All from `@shadcn/react/message-scroller`.
 | `MessageScroller.Item`     | One message wrapper                                                        | `messageId`, `scrollAnchor`                                                                            |
 | `MessageScroller.Button`   | Scroll-to-end/start affordance; auto-hides when caught up                  | `direction`                                                                                            |
 
+Only an `Item` is a message. Anything else rendered in `Content` — a loading
+row, an empty state, a failed fetch's retry card — is drawn and measured, so it
+takes up its room, but it is not counted as a row, never anchored to, and never
+spends `defaultScrollPosition`. A thread that opens on a placeholder therefore
+opens at its `defaultScrollPosition` when the messages arrive.
+
 ### Hooks (flat siblings)
 
-| Hook                             | Returns                                                                     |
-| -------------------------------- | --------------------------------------------------------------------------- |
-| `useMessageScroller()`           | `{ scrollToMessage, scrollToStart, scrollToEnd, releaseAutoScroll }`         |
+| Hook                             | Returns                                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `useMessageScroller()`           | `{ scrollToMessage, scrollToStart, scrollToEnd, releaseAutoScroll }`                     |
 | `useMessageScrollerScrollable()` | `MessageScrollerScrollable` — `{ start, end }`, the edges the viewport can scroll toward |
-| `useMessageScrollerVisibility()` | `MessageScrollerVisibilityState` — `currentAnchorId`, `visibleMessageIds`   |
+| `useMessageScrollerVisibility()` | `MessageScrollerVisibilityState` — `currentAnchorId`, `visibleMessageIds`                |
 
 ### Types
 

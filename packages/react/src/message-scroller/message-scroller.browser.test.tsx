@@ -63,6 +63,7 @@ function Thread({
   autoScroll,
   defaultScrollPosition,
   items,
+  placeholder,
   scrollPreviousItemPeek,
   showButton = false,
   showJumpButton = false,
@@ -75,6 +76,8 @@ function Thread({
     typeof MessageScrollerProvider
   >["defaultScrollPosition"]
   items: TestItem[]
+  /** Height of a row the caller drew that is not a message, e.g. a spinner. */
+  placeholder?: number
   scrollPreviousItemPeek?: number
   showButton?: boolean
   showJumpButton?: boolean
@@ -100,6 +103,9 @@ function Thread({
           <MessageScrollerContent
             style={{ display: "flex", flexDirection: "column" }}
           >
+            {placeholder === undefined ? null : (
+              <div style={{ height: placeholder, flex: "none" }}>Loading</div>
+            )}
             {items.map((item) => (
               <MessageScrollerItem
                 key={item.id}
@@ -322,6 +328,40 @@ test("opens at the bottom by default", async () => {
   await renderThread({ items: createItems(8) })
 
   expect(getDistanceToBottom(getViewport())).toBeLessThanOrEqual(1)
+})
+
+// A thread whose messages are fetched draws something else first -- a spinner,
+// an empty state, a retry card. None of them is a message, so the opening
+// position belongs to the thread that replaces them, not to the wait.
+test("opens at the bottom when the first messages replace a placeholder", async () => {
+  await renderThread({ items: [], placeholder: 40 })
+
+  flushSync(() => {
+    root!.render(<Thread items={createItems(8)} />)
+  })
+  await settle()
+
+  expect(getDistanceToBottom(getViewport())).toBeLessThanOrEqual(1)
+})
+
+// The same swap, read the other way: the arriving thread is the thread opening,
+// so nothing in it is a turn that just arrived, and none of it is anchored to.
+test("does not anchor the first message when it replaces a placeholder", async () => {
+  await renderThread({ items: [], placeholder: 40 })
+
+  flushSync(() => {
+    root!.render(
+      <Thread
+        items={createItems(8).map((item, index) => ({
+          ...item,
+          scrollAnchor: index % 2 === 0,
+        }))}
+      />
+    )
+  })
+  await settle()
+
+  expect(getScrollTop(getViewport())).toBeGreaterThan(0)
 })
 
 test("keeps auto-scroll pinned when the final message grows", async () => {
